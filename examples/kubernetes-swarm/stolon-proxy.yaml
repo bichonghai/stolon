@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stolon-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: stolon-proxy
+      stolon-cluster: kube-stolon
+  template:
+    metadata:
+      labels:
+        component: stolon-proxy
+        stolon-cluster: kube-stolon
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: stolon-proxy
+          image: sorintlab/stolon:master-pg10
+          command:
+            #  value: "true"
+          - gosu
+          - stolon
+          - stolon-proxy
+          - --listen-address
+          - 0.0.0.0
+          - --cluster-name
+          - kube-stolon
+          - --store-backend=etcdv3
+          - --store-endpoints
+          - https://172.17.8.114:2379,https://172.17.8.115:2379,https://172.17.8.116:2379 
+          - --store-ca-file
+          - /etc/kubernetes/ssl/ca.pem
+          - --store-key
+          - /etc/kubernetes/ssl/kubelet-key.pem
+          - --store-cert-file
+          - /etc/kubernetes/ssl/kubelet.pem
+          ports:
+            - containerPort: 5432
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - mountPath: /etc/kubernetes/ssl
+              name: etcd-cert
+      volumes:
+        - name: etcd-cert
+          hostPath:
+            path: /etc/kubernetes/ssl
+

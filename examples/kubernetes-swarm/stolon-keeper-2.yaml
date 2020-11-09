@@ -1,0 +1,64 @@
+# PetSet was renamed to StatefulSet in k8s 1.5
+# apiVersion: apps/v1alpha1
+# kind: PetSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stolon-keeper2
+spec:
+  serviceName: "stolon-keeper2"
+  replicas: 1
+  selector:
+    matchLabels:
+      component: stolon-keeper2
+      stolon-cluster: kube-stolon
+  template:
+    metadata:
+      labels:
+        component: stolon-keeper2
+        stolon-cluster: kube-stolon
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      nodeName: 172.17.8.115
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: stolon-keeper2
+          image: sorintlab/stolon:master-pg10
+          command:
+            - "/bin/bash"
+            - "-ec"
+            - |
+              export POD_IP=$(hostname -i)
+              gosu stolon stolon-keeper  --pg-listen-address $POD_IP  --pg-repl-username  replication  --uid  keeper2  --pg-su-username postgres --pg-su-passwordfile  /etc/secrets/stolon/password --pg-repl-passwordfile  /etc/secrets/stolon/password --data-dir  /stolon-data --cluster-name  kube-stolon  --store-backend=etcdv3  --store-endpoints https://172.17.8.114:2379,https://172.17.8.115:2379,https://172.17.8.116:2379 --store-ca-file /etc/kubernetes/ssl/ca.pem --store-key /etc/kubernetes/ssl/kubelet-key.pem --store-cert-file  /etc/kubernetes/ssl/kubelet.pem 
+          env:
+          - name: PGDATA
+            value: /stolon-data
+          ports:
+            - containerPort: 5432
+            - containerPort: 8080
+          volumeMounts:
+            - mountPath: /stolon-data
+              name: data
+            - mountPath: /etc/secrets/stolon
+              name: stolon
+          volumeMounts:
+            - mountPath: /etc/secrets/stolon
+              name: stolon
+            - mountPath: /stolon-data
+              name: data
+            - mountPath: /etc/kubernetes/ssl
+              name: etcd
+      volumes:
+        - name: stolon
+          hostPath:
+            path: /home/ruijie/ruijie-sourceid/stonlon/stonlon
+        - name: data
+          hostPath:
+            path: /home/ruijie/ruijie-sourceid/stonlon/stolon-data
+        - name: etcd
+          hostPath:
+            path: /etc/kubernetes/ssl
+
